@@ -1,1 +1,1 @@
-Live Site failed. The offline version is the only available version for now (1. Code, 2. Download Zip, 3. Show In Folder, 4. Double Click To Open)
+Live Site failed. The offline version is the only available version for now (1. Code, 2. Download Zip, 3. Show In Folder, 4. Double Click The Highlighted Folder, 5. Find f.html And Double Click That).
