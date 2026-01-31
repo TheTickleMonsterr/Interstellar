@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Interstellar Mini Browser — Dark (Upgraded)</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#0f1620; --muted:#9aa5b1; --accent:#5ce1ff; --glass: rgba(255,255,255,0.03); --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+  body{background:linear-gradient(180deg,#061018 0%, #07121a 100%); color:#e6eef6; display:flex; flex-direction:column; gap:8px; padding:12px; min-height:100vh;}
+
+  /* Top chrome */
+  .chrome { display:flex; gap:8px; align-items:center; background:linear-gradient(180deg,var(--panel), #0b1320); padding:10px; border-radius:12px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+  .nav { display:flex; gap:6px; align-items:center; background:var(--glass); padding:6px; border-radius:10px; }
+  button.icon { background:transparent; border:none; color:var(--muted); padding:8px; border-radius:8px; cursor:pointer; }
+  button.icon:hover{background:rgba(255,255,255,0.02); color:var(--accent)}
+  #url { flex:1; margin-left:8px; padding:8px 12px; border-radius:10px; border:none; outline:none; background:#071722; color: #e6eef6; font-size:14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);}
+  #url::placeholder{color: #5d6972}
+
+  /* Tabs row */
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding:6px; border-radius:10px; }
+  .tab { background:transparent; padding:8px 12px; border-radius:10px; color:var(--muted); display:flex; gap:8px; align-items:center; border:1px solid transparent; cursor:pointer; white-space:nowrap; }
+  .tab.active{ background:linear-gradient(90deg, rgba(92,225,255,0.06), rgba(92,225,255,0.03)); color:var(--accent); border-color:rgba(92,225,255,0.08); font-weight:600;}
+  .tab .x { font-weight:700; color:var(--danger); padding:2px 6px; border-radius:6px; font-size:12px;}
+  .tab .title{max-width:220px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle}
+
+  /* viewer area */
+  .viewer-wrap{flex:1; display:flex; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.03); background:#051018;}
+  iframe {width:100%; height:100%; border:0; background:white;}
+
+  /* Home page styles for the internal srcdoc */
+  /* layout: search left, games right (wraps on small screens) */
+  .hp-wrap{display:flex; gap:20px; align-items:flex-start; padding:36px; height:100vh; background:linear-gradient(180deg,#071018,#041018); box-sizing:border-box;}
+  .hp-left{flex:1; min-width:260px}
+  .hp-right{width:320px; min-width:200px}
+  .hp h1{margin:0;font-size:30px}
+  .hp p{margin:6px 0 0;color:var(--muted)}
+  .search-big{margin-top:18px; display:flex; gap:8px}
+  .search-big input{flex:1;padding:14px;border-radius:12px;border:0;background:#04121a;color:#e6eef6;font-size:16px}
+  .search-big button{padding:12px 14px;border-radius:12px;border:0;background:var(--accent);color:#001b21;font-weight:700;cursor:pointer}
+  .games-card{background:rgba(255,255,255,0.02); padding:12px; border-radius:10px; margin-bottom:10px; cursor:pointer; border:1px solid rgba(255,255,255,0.02)}
+  .muted{color:var(--muted); font-size:13px}
+  @media (max-width:900px){ .hp-wrap{flex-direction:column} .hp-right{width:100%} .tabs .title{max-width:120px} }
+
+  /* small helpers */
+  .right {margin-left:auto}
+  .kbd {background:#071722;padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.02); font-size:12px; color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="nav" style="align-items:center">
+    <button class="icon" id="backBtn" title="Back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <button class="icon" id="forwardBtn" title="Forward">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <button class="icon" id="reloadBtn" title="Reload">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 10-3 6.71L21 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 3v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <button class="icon" id="homeBtn" title="Home">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 11.5L12 4l9 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 20.5V11h14v9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <input id="url" placeholder="Search" spellcheck="false" />
+
+  <div class="nav right" style="gap:8px">
+    <div class="kbd">Ctrl/Cmd+T</div>
+    <button class="icon" id="newTabBtn" title="New Tab">+</button>
+    <button class="icon" id="fullscreenBtn" title="Fullscreen">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 3H5a2 2 0 00-2 2v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 21h3a2 2 0 002-2v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="viewer-wrap" id="viewerWrap"></div>
+
+<script>
+/* Interstellar Mini Browser — upgraded home and reliability
+   - Edit game links inside HOME_SRC (see comment).
+   - Home replaces current tab history so it behaves consistently.
+   - Performance: only active tab's iframe is in the DOM (others removed).
+*/
+
+const viewerWrap = document.getElementById('viewerWrap');
+const tabsBar = document.getElementById('tabs');
+const urlInput = document.getElementById('url');
+const backBtn = document.getElementById('backBtn');
+const forwardBtn = document.getElementById('forwardBtn');
+const reloadBtn = document.getElementById('reloadBtn');
+const homeBtn = document.getElementById('homeBtn');
+const newTabBtn = document.getElementById('newTabBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+let tabCounter = 0;
+const tabs = {}; // id -> {btn, iframe, history:[], idx}
+let activeId = null;
+
+// ----- HOME content -----
+// Edit the game cards below inside <div id="games-list">. Use data-href to set the URL.
+// Example: <div class="games-card" data-href="https://example.com/mygame">My Game</div>
+const HOME_SRC = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Proxy (kinda)</title>
+<style>
+  :root{--bg:#071420;--accent:#5ce1ff;--muted:#9aa5b1}
+  body{margin:0;background:linear-gradient(180deg,#071018,#041018);color:#dff6ff;font-family:Inter,Arial,Helvetica;padding:28px;height:100vh;box-sizing:border-box}
+  .hp-wrap{display:flex;gap:20px;align-items:flex-start}
+  .hp-left{flex:1;min-width:260px}
+  .hp-right{width:320px;min-width:200px}
+  h1{margin:0;font-size:28px}
+  .muted{color:var(--muted)}
+  .search{margin-top:18px;display:flex;gap:8px}
+  .search input{flex:1;padding:14px;border-radius:12px;border:0;background:#04121a;color:#e6eef6;font-size:16px}
+  .search button{padding:12px 14px;border-radius:12px;border:0;background:var(--accent);color:#001b21;font-weight:700;cursor:pointer}
+  .games-card{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;margin-bottom:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+  .games-list{margin-top:12px}
+  @media (max-width:900px){ .hp-wrap{flex-direction:column} .hp-right{width:100%} }
+</style>
+</head>
+<body>
+  <div class="hp-wrap">
+    <div class="hp-left">
+      <h1>Interstellar</h1>
+      <p class="muted">Quick search + games</p>
+      <div class="search">
+        <input id="bigSearch" placeholder="Search" />
+        <button id="searchBtn">Go</button>
+      </div>
+      <p class="muted" style="margin-top:12px">Some links may not work</p>
+    </div>
+
+    <div class="hp-right">
+      <h3 style="margin:0 0 8px 0">Games</h3>
+      <div class="games-list" id="games-list">
+        <!-- EDIT THESE CARDS to add your game links -->
+        <div class="games-card" data-href="https://irv77.github.io/AmplerLauncher/">Minecraft (eaglercraft) launcher</div>
+        <div class="games-card" data-href="https://duckmath.top">Duckmath Games (you can play COD)</div>
+        <div class="games-card" data-href="https://eaglercraft.com/">Eaglercraft's main website (it includes the newest official releases of Eaglercraft). </div>
+        <div class="games-card" >If you are on a website and click a link and it says its blocked, do not freak out. Just copy and paste the link into our search bar, especially for the Eaglercraft Launcher. There is a tab and fullscreen button in the top right (kinda hard to see). </div>
+        <!-- End edit area -->
+      </div>
+    </div>
+  </div>
+
+<script>
+  // send navigation message to parent; newTab=false opens in current tab
+  function nav(url, newTab=false){ parent.postMessage({type:'nav', url:url, newTab:newTab}, '*'); }
+
+  document.getElementById('searchBtn').addEventListener('click', () => {
+    const q = document.getElementById('bigSearch').value.trim();
+    if(!q) return;
+    if(q.startsWith('?')){
+      const s = 'https://www.bing.com/?scope=web&cc=US' + encodeURIComponent(q.slice(1).trim());
+      nav(s, false);
+    } else nav(q, false);
+  });
+
+  document.getElementById('bigSearch').addEventListener('keypress', (e) => {
+    if(e.key === 'Enter') document.getElementById('searchBtn').click();
+  });
+
+  document.querySelectorAll('.games-card').forEach(c => {
+    c.addEventListener('click', () => {
+      const href = c.dataset.href;
+      if(href) nav(href, false);
+    });
+  });
+
+  // signal ready
+  parent.postMessage({type:'ready'}, '*');
+<\/script>
+</body>
+</html>`;
+
+// helper to create elements
+function el(tag, cls, html){ const e = document.createElement(tag); if(cls) e.className = cls; if(html!==undefined) e.innerHTML = html; return e; }
+
+function createTab(openHome=true, initialUrl=null){
+  tabCounter++;
+  const id = 't'+tabCounter;
+
+  // tab button
+  const btn = el('div','tab');
+  const titleSpan = el('span','title','New Tab');
+  const closeSpan = el('span','x','✕');
+  btn.appendChild(titleSpan);
+  btn.appendChild(closeSpan);
+  tabsBar.appendChild(btn);
+
+  // create iframe (we won't attach to DOM until active)
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('allowfullscreen','');
+  iframe.setAttribute('referrerpolicy','no-referrer');
+  iframe.style.background='white';
+
+  const state = { btn, iframe, history:[], idx:-1 };
+  tabs[id] = state;
+
+  btn.addEventListener('click', () => switchToTab(id));
+  closeSpan.addEventListener('click', (ev) => { ev.stopPropagation(); closeTab(id); });
+
+  // update title when same-origin (rare) or use history label on load
+  iframe.addEventListener('load', () => {
+    try {
+      const doc = iframe.contentDocument;
+      if(doc){
+        const title = doc.title || (state.history[state.idx] && state.history[state.idx].value) || 'New Tab';
+        titleSpan.textContent = title.length>28?title.slice(0,25)+'...':title;
+      }
+      // if same-origin update history with real href
+      const href = iframe.contentWindow.location.href;
+      if(href && (!state.history[state.idx] || state.history[state.idx].value !== href)){
+        pushHistory(state, {type:'url', value:href}, true);
+      }
+    } catch(e){
+      // cross-origin - fallback to showing the last stored url/label
+      const cur = state.history[state.idx];
+      if(cur){
+        if(cur.type === 'url') titleSpan.textContent = cur.value.replace(/^https?:\/\//,'').replace(/\/.*$/,'').slice(0,28);
+        else titleSpan.textContent = 'Home';
+      }
+    }
+    updateNavButtons();
+  });
+
+  // initial content
+  if(initialUrl){
+    navigateTo(id, initialUrl, false);
+  } else if(openHome){
+    navigateTo(id, {type:'srcdoc', value: HOME_SRC}, false);
+  } else {
+    navigateTo(id, {type:'srcdoc', value:'<html><body style="background:#071018;color:#dff6ff;font-family:Inter;padding:28px"><h2>Blank</h2></body></html>'}, false);
+  }
+
+  switchToTab(id);
+  return id;
+}
+
+function switchToTab(id){
+  if(!tabs[id]) return;
+  if(activeId && tabs[activeId]){
+    tabs[activeId].btn.classList.remove('active');
+    const oldI = tabs[activeId].iframe;
+    if(oldI.parentElement === viewerWrap) viewerWrap.removeChild(oldI);
+  }
+  activeId = id;
+  const s = tabs[id];
+  s.btn.classList.add('active');
+  viewerWrap.appendChild(s.iframe);
+  const cur = s.history[s.idx];
+  urlInput.value = cur ? (cur.type === 'url' ? cur.value : 'home://') : '';
+  updateNavButtons();
+  // scroll tab into view
+  s.btn.scrollIntoView({inline:'center',behavior:'smooth'});
+}
+
+function closeTab(id){
+  if(!tabs[id]) return;
+  const wasActive = (id === activeId);
+  tabs[id].btn.remove();
+  if(tabs[id].iframe.parentElement) tabs[id].iframe.remove();
+  delete tabs[id];
+  if(wasActive){
+    const keys = Object.keys(tabs);
+    if(keys.length) switchToTab(keys[0]);
+    else createTab(true);
+  }
+}
+
+function updateNavButtons(){
+  if(!activeId) return;
+  const s = tabs[activeId];
+  backBtn.disabled = !(s.idx > 0);
+  forwardBtn.disabled = !(s.idx < s.history.length - 1);
+}
+
+function pushHistory(state, entry, replace=false){
+  if(replace){
+    if(state.idx >= 0) state.history[state.idx] = entry;
+    else { state.history.push(entry); state.idx = state.history.length - 1; }
+  } else {
+    if(state.idx < state.history.length - 1) state.history.splice(state.idx+1);
+    state.history.push(entry);
+    state.idx = state.history.length - 1;
+  }
+  updateNavButtons();
+}
+
+function navigateTo(tabId, target, replace=false){
+  const s = tabs[tabId];
+  if(!s) return;
+  let entry;
+  if(typeof target === 'string') entry = {type:'url', value: normalizeUrl(target)};
+  else entry = target.type === 'srcdoc' ? {type:'srcdoc', value: target.value} : {type:'url', value: normalizeUrl(target.value)};
+
+  // set iframe content
+  if(entry.type === 'srcdoc'){
+    s.iframe.srcdoc = entry.value;
+    s.iframe.removeAttribute('src');
+  } else {
+    s.iframe.src = entry.value;
+    s.iframe.removeAttribute('srcdoc');
+  }
+
+  pushHistory(s, entry, replace);
+  try {
+    const titleEl = s.btn.querySelector('.title');
+    if(entry.type === 'srcdoc') titleEl.textContent = 'Home';
+    else titleEl.textContent = entry.value.replace(/^https?:\/\//,'').replace(/\/.*$/,'').slice(0,28);
+  } catch(e){}
+  if(activeId === tabId) urlInput.value = entry.type === 'url' ? entry.value : 'home://';
+  updateNavButtons();
+}
+
+function normalizeUrl(raw){
+  raw = String(raw).trim();
+  if(raw === 'home://') return raw;
+  if(raw.startsWith('?')){
+    const q = raw.slice(1).trim();
+    return 'https://www.bing.com/?scope=web&cc=US' + encodeURIComponent(q);
+  }
+  if(/^https?:\/\//i.test(raw)) return raw;
+  if(raw.includes('.') && !raw.includes(' ')) return 'https://' + raw;
+  return 'https://www.bing.com/?scope=web&cc=US' + encodeURIComponent(raw);
+}
+
+// Controls
+backBtn.addEventListener('click', () => {
+  if(!activeId) return;
+  const s = tabs[activeId];
+  if(s.idx > 0){
+    s.idx--;
+    const entry = s.history[s.idx];
+    if(entry.type === 'srcdoc'){ s.iframe.srcdoc = entry.value; s.iframe.removeAttribute('src'); }
+    else { s.iframe.src = entry.value; s.iframe.removeAttribute('srcdoc'); }
+    urlInput.value = entry.type === 'url' ? entry.value : 'home://';
+    updateNavButtons();
+  }
+});
+
+forwardBtn.addEventListener('click', () => {
+  if(!activeId) return;
+  const s = tabs[activeId];
+  if(s.idx < s.history.length - 1){
+    s.idx++;
+    const entry = s.history[s.idx];
+    if(entry.type === 'srcdoc'){ s.iframe.srcdoc = entry.value; s.iframe.removeAttribute('src'); }
+    else { s.iframe.src = entry.value; s.iframe.removeAttribute('srcdoc'); }
+    urlInput.value = entry.type === 'url' ? entry.value : 'home://';
+    updateNavButtons();
+  }
+});
+
+reloadBtn.addEventListener('click', () => {
+  if(!activeId) return;
+  const s = tabs[activeId];
+  try { s.iframe.contentWindow.location.reload(); }
+  catch(e){
+    const cur = s.history[s.idx];
+    if(cur){
+      if(cur.type === 'url') s.iframe.src = cur.value;
+      else s.iframe.srcdoc = cur.value;
+    }
+  }
+});
+
+// Home: replace current history entry for reliability (if no tab, create one)
+homeBtn.addEventListener('click', () => {
+  if(!activeId) createTab(true);
+  navigateTo(activeId, {type:'srcdoc', value: HOME_SRC}, true); // replace current entry
+});
+
+newTabBtn.addEventListener('click', () => createTab(true));
+
+fullscreenBtn.addEventListener('click', () => {
+  if(!activeId) return;
+  const el = tabs[activeId].iframe;
+  if(el.requestFullscreen) el.requestFullscreen();
+});
+
+// Address bar navigation
+urlInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){
+    const raw = urlInput.value.trim();
+    if(!activeId) createTab(true);
+    if(raw === 'home://' || raw === '') navigateTo(activeId, {type:'srcdoc', value: HOME_SRC});
+    else navigateTo(activeId, raw);
+  }
+});
+
+// keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if(mod && e.key.toLowerCase() === 't'){ e.preventDefault(); createTab(true); }
+  if(mod && e.key.toLowerCase() === 'w'){ e.preventDefault(); if(activeId) closeTab(activeId); }
+  if(e.key === 'Escape'){ if(document.fullscreenElement) document.exitFullscreen(); }
+});
+
+// Listen for nav messages from HOME srcdoc or other same-origin frames
+window.addEventListener('message', (ev) => {
+  try {
+    const data = ev.data;
+    if(!data || data.type !== 'nav' || !data.url) return;
+    const url = data.url;
+    const newTab = !!data.newTab;
+    if(newTab) createTab(false, url);
+    else {
+      if(!activeId) createTab(true);
+      navigateTo(activeId, url);
+    }
+  } catch(e){}
+}, false);
+
+// create initial home tab
+createTab(true);
+
+// small neatness: observe tab additions to center active
+const observer = new MutationObserver(() => {
+  if(activeId && tabs[activeId]) tabs[activeId].btn.scrollIntoView({inline:'center',behavior:'smooth'});
+});
+observer.observe(tabsBar, {childList:true, subtree:true});
+
+updateNavButtons();
+</script>
+</body>
+</html>
